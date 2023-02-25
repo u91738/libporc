@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <memory>
 #include <cassert>
 #include <vector>
@@ -58,6 +59,8 @@ static std::vector<uint8_t> decrypt_block(
         padding_mask.push_back(exp_pad_byte ^ v);
         plaintext[block_size - i] = *prev_block_end ^ exp_pad_byte ^ v;
         apply_padding(config, block_size, padding_mask, block_start);
+
+        config.on_new_byte(plaintext, block_size - i);
     }
 
     return plaintext;
@@ -81,6 +84,7 @@ std::vector<uint8_t> decrypt(
                   ciphertext.begin() + (block + 1) * block_size,
                   ct.end() - block_size);
 
+        config.on_new_block(ciphertext, ct);
         auto prev_block_start = block == 0 ? iv.begin() : ciphertext.begin() + (block - 1) * block_size;
         auto prev_block_end = prev_block_start + block_size;
 
@@ -88,6 +92,104 @@ std::vector<uint8_t> decrypt(
         plaintext.insert(plaintext.end(), block_pt.begin(), block_pt.end());
     }
     return plaintext;
+}
+
+namespace stats {
+
+void mean_collector::add(int64_t v)
+{
+    this->sum += (uintmax_t)v;
+    ++this->n;
+}
+
+int64_t mean_collector::reset()
+{
+    assert(this->n > 0);
+    int64_t r = this->sum / this->n;
+    this->sum = 0;
+    this->n = 0;
+    return r;
+}
+
+void median_collector::add(int64_t v)
+{
+    this->values.push_back(v);
+}
+
+int64_t median_collector::reset()
+{
+    assert(!this->values.empty());
+    std::sort(this->values.begin(), this->values.end());
+    int64_t r = this->values[this->values.size() / 2];
+    this->values.clear();
+    return r;
+}
+
+}
+
+namespace timed {
+
+timed_porc::timed_porc(
+    porc::stats::collector *st,
+    decryptor_factory *dec,
+    unsigned measurement_repetitions,
+    bool measure_error)
+: reps(measurement_repetitions), stats(st), decryptor(dec)
+{
+    this->measured.measure_error = measure_error;
+}
+
+int64_t timed_porc::measure_decryptions(const std::vector<uint8_t> &a)
+{
+    auto dec = this->decryptor->get(a);
+    for(unsigned i = 0; i < this->reps; ++i)
+        this->stats->add(dec->measure());
+    return this->stats->reset();
+}
+
+void timed_porc::on_new_byte(
+    const std::vector<uint8_t> &block_pt,
+    size_t pt_start_ind)
+{
+    this->measured.plaintext.assign(block_pt.begin() + pt_start_ind, block_pt.end());
+    this->decryptor->on_progress(progress::BYTE, this->measured);
+}
+
+void timed_porc::on_new_block(
+    const std::vector<uint8_t> &orig_ct,
+    const std::vector<uint8_t> &playground_ct)
+{
+    this->measured.good_time = this->measure_decryptions(orig_ct);
+    // playground is previous block or IV, so it is very unlikely to have good padding
+    // well very unlikely is still more likely than 1/256
+    this->measured.bad_time = this->measure_decryptions(playground_ct);
+    if(this->measured.measure_error)
+        this->measured.error = this->measured.bad_time - this->measure_decryptions(playground_ct);
+
+    this->decryptor->on_progress(progress::BLOCK, this->measured);
+}
+
+bool timed_porc::is_good(int64_t current)
+{
+    auto avg = (this->measured.good_time + this->measured.bad_time) / 2;
+    if(this->measured.good_time > this->measured.bad_time)
+        return current > avg;
+    else
+        return current < avg;
+}
+
+bool timed_porc::is_well_padded(
+            const std::vector<uint8_t> &iv,
+            const std::vector<uint8_t> &data)
+{
+    this->measured.current = this->measure_decryptions(data);
+    this->measured.guess = this->is_good(this->measured.current);
+
+    this->decryptor->on_progress(progress::MEASUREMENT, this->measured);
+    ++this->measured.iter;
+    return this->measured.guess;
+}
+
 }
 
 }

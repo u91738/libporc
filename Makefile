@@ -5,7 +5,7 @@ CXXFLAGS= \
 	-fsanitize=undefined \
 	-fsanitize=bounds-strict \
 	-fstack-protector-all \
-	-g -Wall -Werror
+	-O2 -flto -g -Wall #-DUSLEEP_CHEAT #-Werror
 
 porc:
 	$(CXX) $(CXXFLAGS) porc.cpp example.cpp -lcrypto -o $@
