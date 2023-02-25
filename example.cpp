@@ -8,6 +8,10 @@
 
 #include "porc.hpp"
 
+/*
+    Basic encryption-decryption
+*/
+
 static std::vector<uint8_t> iv = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
 static std::vector<uint8_t> key = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
                                     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
@@ -72,6 +76,10 @@ static  std::optional<std::vector<uint8_t>> cbc_aes256_decrypt(
     return  make_optional(plain);
 }
 
+/*
+    Direct padding oracle
+*/
+
 class example : public porc::porc_pkcs7 {
     public:
         bool is_well_padded(
@@ -81,6 +89,10 @@ class example : public porc::porc_pkcs7 {
             return cbc_aes256_decrypt(iv, key, data).has_value();
         }
 };
+
+/*
+    Timing based padding oracle
+*/
 
 class timed_example : public porc::timed::decryptor {
     private:
@@ -97,7 +109,7 @@ class timed_example : public porc::timed::decryptor {
         }
 };
 
-void dump_vector(const std::vector<uint8_t> &v)
+static void dump_vector(const std::vector<uint8_t> &v)
 {
     for(auto i : v)
         printf("%02X", i);
@@ -106,6 +118,7 @@ void dump_vector(const std::vector<uint8_t> &v)
 
 int main(void)
 {
+    // run basic encryption-decryption
     auto ciphertext = cbc_aes256_encrypt(iv, key, data);
     printf("ciphertext:     ");
     dump_vector(ciphertext);
@@ -115,11 +128,13 @@ int main(void)
     printf("decrypted:      ");
     dump_vector(dec.value());
 
+    // direct attack
     example conf;
     auto porc_dec = porc::decrypt(conf, iv, ciphertext);
     printf("porc decrypted: ");
     dump_vector(porc_dec);
 
+    // timing attack
 #ifdef USLEEP_CHEAT
     unsigned reps = 100;
 #else
