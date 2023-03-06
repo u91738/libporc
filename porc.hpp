@@ -144,7 +144,7 @@ class decryptor_factory_default : public decryptor_factory {
         {
             switch(event) {
                 case progress::BLOCK:
-                    printf("good: %"PRId64" bad: %"PRId64" diff: %"PRId64" measured_error: %"PRId64"\n",
+                    printf("good: %" PRId64 " bad: %" PRId64 " diff: %" PRId64 " measured_error: %" PRId64 "\n",
                             m.good_time,
                             m.bad_time,
                             m.good_time - m.bad_time,
@@ -158,7 +158,7 @@ class decryptor_factory_default : public decryptor_factory {
                 break;
                 case progress::MEASUREMENT:
                     if (verbose) {
-                        printf("iter: %u timing: %"PRId64" padding is %s\n",
+                        printf("iter: %u timing: %" PRId64 " padding is %s\n",
                             m.iter,
                             m.current,
                             m.guess ? "good" : "bad");
