@@ -26,14 +26,16 @@ static void apply_padding(
 
 static std::vector<uint8_t> decrypt_block(
     porc_provider &config,
-    const std::vector<uint8_t> &iv,
+    std::vector<uint8_t> &iv,
     std::vector<uint8_t> &ct,
     std::vector<uint8_t>::const_iterator prev_block_end
 )
 {
     size_t block_size = iv.size();
-    auto block_start = ct.end() - block_size * 2;
-    auto block_end = ct.end() - block_size;
+    auto block_end = ct.size() > block_size ?
+                         ct.end() - block_size:
+                         iv.end();
+    auto block_start = block_end - block_size;
 
     std::vector<uint8_t> padding_mask;
     std::vector<uint8_t> plaintext(block_size);
@@ -88,7 +90,9 @@ std::vector<uint8_t> decrypt(
         auto prev_block_start = block == 0 ? iv.begin() : ciphertext.begin() + (block - 1) * block_size;
         auto prev_block_end = prev_block_start + block_size;
 
-        auto block_pt = decrypt_block(config, iv, ct, prev_block_end);
+        std::vector<uint8_t> iv_tmp(iv);
+
+        auto block_pt = decrypt_block(config, iv_tmp, ct, prev_block_end);
         plaintext.insert(plaintext.end(), block_pt.begin(), block_pt.end());
     }
     return plaintext;

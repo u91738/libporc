@@ -18,6 +18,8 @@ static std::vector<uint8_t> key = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 1
 static std::vector<uint8_t> data = { 11, 12, 13, 14, 15, 16, 17, 18, 19, 110, 111, 112, 113, 114, 115, 116,
                                       21, 22, 23, 24, 25, 26, 27, 28, 29, 210, 211, 212, 213, 214 };
 
+static std::vector<uint8_t> data2 = { 21, 22, 23, 24, 25, 26, 27, 28, 29, 210, 211, 212, 213, 214 };
+
 static std::vector<uint8_t> cbc_aes256_encrypt(
     const std::vector<uint8_t> &iv,
     const std::vector<uint8_t> &key,
@@ -132,6 +134,11 @@ int main(void)
     example conf;
     auto porc_dec = porc::decrypt(conf, iv, ciphertext);
     printf("porc decrypted: ");
+    dump_vector(porc_dec);
+
+    auto ciphertext2 = cbc_aes256_encrypt(iv, key, data2);
+    porc_dec = porc::decrypt(conf, iv, ciphertext2);
+    printf("porc decrypted2: ");
     dump_vector(porc_dec);
 
     // timing attack
