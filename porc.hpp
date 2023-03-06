@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <cstdio>
 #include <vector>
 
@@ -142,21 +143,21 @@ class decryptor_factory_default : public decryptor_factory {
         {
             switch(event) {
                 case progress::BLOCK:
-                    printf("good: %ld bad: %ld diff: %ld measured_error: %ld\n",
+                    printf("good: %"PRId64" bad: %"PRId64" diff: %"PRId64" measured_error: %"PRId64"\n",
                             m.good_time,
                             m.bad_time,
                             m.good_time - m.bad_time,
                             m.error);
                 break;
                 case progress::BYTE:
-                    printf("Known block plaintext:");
+                    printf("Known block plaintext: ");
                     for(auto i : m.plaintext)
                         printf("%02X", i);
                     printf("\n");
                 break;
                 case progress::MEASUREMENT:
                     if (verbose) {
-                        printf("iter: %u timing: %ld padding is %s\n",
+                        printf("iter: %u timing: %"PRId64" padding is %s\n",
                             m.iter,
                             m.current,
                             m.guess ? "good" : "bad");
