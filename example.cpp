@@ -8,6 +8,13 @@
 
 #include "porc.hpp"
 
+static void dump_vector(const std::vector<uint8_t> &v)
+{
+    for(auto i : v)
+        printf("%02X", i);
+    printf("\n");
+}
+
 /*
     Basic encryption-decryption
 */
@@ -98,9 +105,11 @@ class example : public porc::porc_pkcs7 {
 
 class timed_example : public porc::timed::decryptor {
     private:
+        std::vector<uint8_t> iv;
         std::vector<uint8_t> data;
     public:
-        timed_example(const std::vector<uint8_t> &d) : data(d) { }
+        timed_example(const std::vector<uint8_t> &iv,
+                      const std::vector<uint8_t> &d) : iv(iv), data(d) { }
 
         int64_t measure() override
         {
@@ -110,13 +119,6 @@ class timed_example : public porc::timed::decryptor {
             return std::chrono::nanoseconds(end - start).count();
         }
 };
-
-static void dump_vector(const std::vector<uint8_t> &v)
-{
-    for(auto i : v)
-        printf("%02X", i);
-    printf("\n");
-}
 
 int main(void)
 {
@@ -135,11 +137,13 @@ int main(void)
     auto porc_dec = porc::decrypt(conf, iv, ciphertext);
     printf("porc decrypted: ");
     dump_vector(porc_dec);
+    assert(std::equal(data.begin(), data.end(), porc_dec.begin()));
 
     auto ciphertext2 = cbc_aes256_encrypt(iv, key, data2);
     porc_dec = porc::decrypt(conf, iv, ciphertext2);
     printf("porc decrypted2: ");
     dump_vector(porc_dec);
+    assert(std::equal(data2.begin(), data2.end(), porc_dec.begin()));
 
     // timing attack
 #ifdef USLEEP_CHEAT
@@ -148,9 +152,15 @@ int main(void)
     unsigned reps = 2000000;
 #endif
     porc::stats::median_collector stats;
-    porc::timed::decryptor_factory_default<timed_example, true> decryptors;
+    porc::timed::decryptor_factory_default<timed_example, false> decryptors;
     porc::timed::timed_porc timed_conf(&stats, &decryptors, reps, true);
     auto timed_porc_dec = porc::decrypt(timed_conf, iv, ciphertext);
     printf("timed porc decrypted: ");
     dump_vector(timed_porc_dec);
+    assert(std::equal(data.begin(), data.end(), timed_porc_dec.begin()));
+
+    timed_porc_dec = porc::decrypt(timed_conf, iv, ciphertext2);
+    printf("timed porc decrypted2: ");
+    dump_vector(timed_porc_dec);
+    assert(std::equal(data2.begin(), data2.end(), timed_porc_dec.begin()));
 }

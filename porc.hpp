@@ -23,6 +23,7 @@ class porc_provider {
         { }
 
         virtual void on_new_block(
+            const std::vector<uint8_t> &orig_iv,
             const std::vector<uint8_t> &orig_ct,
             const std::vector<uint8_t> &playground_ct)
         { }
@@ -116,7 +117,10 @@ class decryptor {
 */
 class decryptor_factory {
     public:
-        virtual std::unique_ptr<decryptor> get(const std::vector<uint8_t> &data) = 0;
+        virtual std::unique_ptr<decryptor> get(
+            const std::vector<uint8_t> &iv,
+            const std::vector<uint8_t> &data
+        ) = 0;
         virtual void on_progress(progress event, measurements &m) = 0;
         virtual ~decryptor_factory() = default;
 };
@@ -127,9 +131,11 @@ class decryptor_factory {
 template<typename T, bool verbose>
 class decryptor_factory_default : public decryptor_factory {
     public:
-        std::unique_ptr<decryptor> get(const std::vector<uint8_t> &data) override
+        std::unique_ptr<decryptor> get(
+            const std::vector<uint8_t> &iv,
+            const std::vector<uint8_t> &data) override
         {
-            return std::make_unique<T>(data);
+            return std::make_unique<T>(iv, data);
         }
 
         void on_progress(progress event, measurements &m) override
@@ -187,7 +193,9 @@ class timed_porc : public porc::porc_pkcs7  {
         porc::stats::collector *stats;
         decryptor_factory *decryptor;
 
-        int64_t measure_decryptions(const std::vector<uint8_t> &a);
+        int64_t measure_decryptions(
+            const std::vector<uint8_t> &iv,
+            const std::vector<uint8_t> &a);
 
         bool is_good(int64_t current);
 
@@ -203,6 +211,7 @@ class timed_porc : public porc::porc_pkcs7  {
             size_t pt_start_ind) override;
 
         void on_new_block(
+            const std::vector<uint8_t> &orig_iv,
             const std::vector<uint8_t> &orig_ct,
             const std::vector<uint8_t> &playground_ct) override;
 
@@ -212,12 +221,5 @@ class timed_porc : public porc::porc_pkcs7  {
 };
 
 }
-
-
-
-
-
-
-
 
 }

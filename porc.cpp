@@ -86,7 +86,7 @@ std::vector<uint8_t> decrypt(
                   ciphertext.begin() + (block + 1) * block_size,
                   ct.end() - block_size);
 
-        config.on_new_block(ciphertext, ct);
+        config.on_new_block(iv, ciphertext, ct);
         auto prev_block_start = block == 0 ? iv.begin() : ciphertext.begin() + (block - 1) * block_size;
         auto prev_block_end = prev_block_start + block_size;
 
@@ -143,9 +143,9 @@ timed_porc::timed_porc(
     this->measured.measure_error = measure_error;
 }
 
-int64_t timed_porc::measure_decryptions(const std::vector<uint8_t> &a)
+int64_t timed_porc::measure_decryptions(const std::vector<uint8_t> &iv, const std::vector<uint8_t> &a)
 {
-    auto dec = this->decryptor->get(a);
+    auto dec = this->decryptor->get(iv, a);
     for(unsigned i = 0; i < this->reps; ++i)
         this->stats->add(dec->measure());
     return this->stats->reset();
@@ -160,15 +160,19 @@ void timed_porc::on_new_byte(
 }
 
 void timed_porc::on_new_block(
+    const std::vector<uint8_t> &orig_iv,
     const std::vector<uint8_t> &orig_ct,
     const std::vector<uint8_t> &playground_ct)
 {
-    this->measured.good_time = this->measure_decryptions(orig_ct);
-    // playground is previous block or IV, so it is very unlikely to have good padding
+    this->measured.good_time = this->measure_decryptions(orig_iv, orig_ct);
+    // change playground_ct, so it is very unlikely to have good padding
     // well very unlikely is still more likely than 1/256
-    this->measured.bad_time = this->measure_decryptions(playground_ct);
+    std::vector<uint8_t> pg(playground_ct);
+    ++pg[pg.size() - 1];
+
+    this->measured.bad_time = this->measure_decryptions(orig_iv, pg);
     if(this->measured.measure_error)
-        this->measured.error = this->measured.bad_time - this->measure_decryptions(playground_ct);
+        this->measured.error = this->measured.bad_time - this->measure_decryptions(orig_iv, pg);
 
     this->decryptor->on_progress(progress::BLOCK, this->measured);
 }
@@ -186,7 +190,7 @@ bool timed_porc::is_well_padded(
             const std::vector<uint8_t> &iv,
             const std::vector<uint8_t> &data)
 {
-    this->measured.current = this->measure_decryptions(data);
+    this->measured.current = this->measure_decryptions(iv, data);
     this->measured.guess = this->is_good(this->measured.current);
 
     this->decryptor->on_progress(progress::MEASUREMENT, this->measured);
